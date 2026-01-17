@@ -158,37 +158,32 @@ public AimAndShoot(CommandSwerveDrivetrain drivetrain, Intake intake,
     @Override
     public boolean isFinished(){ return false; }
 
-    private Pose2d getAverageBotPose(){
-        double sumX=0, sumY=0, sumCos=0, sumSin=0;
-        int count=0;
+    private Pose2d getAverageBotPose() {
+    double sumX = 0, sumY = 0, sumCos = 0, sumSin = 0;
+    int count = 0;
 
-        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            for(LimelightConfig cam : LIMELIGHTS){
-                executor.submit(() -> {
-                    if(LimelightHelpers.getTV(cam.name)){
-                        Pose2d pose = LimelightHelpers.getBotPose2d_wpiBlue(cam.name);
+    for(LimelightConfig cam : LIMELIGHTS){
+        if(LimelightHelpers.getTV(cam.name)){
+            Pose2d pose = LimelightHelpers.getBotPose2d_wpiBlue(cam.name);
+            if(pose == null) continue;
 
-                        // Don't do anything if it doesn't return a pose
-                        if(pose==null) continue;
-
-                        // Calculate Average Robot Pose
-                        sumX += pose.getX(); sumY += pose.getY();
-                        double rot = pose.getRotation().getRadians();
-                        sumCos += Math.cos(rot); sumSin += Math.sin(rot);
-                        // Add Camera as working Camera
-                        count++;
-                    }});
-                }
-            }
-
-        if(count==0) if (autoIntakeLightsEnabled) {lights.setColor(235, 52, 52);}; return null;
-
-        double avgX = sumX/count;
-        double avgY = sumY/count;
-        // Find average rotation of limelights
-        double avgRot = Math.atan2(sumSin,sumCos);
-
-	    // Return with type Pose2d (X, Y, Rotation)
-        return new Pose2d(avgX,avgY,new Rotation2d(avgRot));
+            sumX += pose.getX();
+            sumY += pose.getY();
+            double rot = pose.getRotation().getRadians();
+            sumCos += Math.cos(rot);
+            sumSin += Math.sin(rot);
+            count++;
         }
     }
+
+    if(count == 0){
+        if (autoIntakeLightsEnabled) { lights.setColor(235, 52, 52); }
+        return null;
+    }
+
+    double avgX = sumX / count;
+    double avgY = sumY / count;
+    double avgRot = Math.atan2(sumSin, sumCos);
+
+    return new Pose2d(avgX, avgY, new Rotation2d(avgRot));
+}
