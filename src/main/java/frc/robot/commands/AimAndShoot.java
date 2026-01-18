@@ -191,4 +191,5 @@ public AimAndShoot(CommandSwerveDrivetrain drivetrain, Intake intake,
     double avgRot = Math.atan2(sumSin, sumCos);
 
     return new Pose2d(avgX, avgY, new Rotation2d(avgRot));
+    }
 }

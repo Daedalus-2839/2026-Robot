@@ -1,6 +1,7 @@
 // Copyright (c) FIRST and other WPILib contributors.
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
+// Uses REVLib 2026.0.0, CTRE Phoenix v6 26.1.0, WPILib-New-Commands 1.0.0, REVLib 2026.0.0
 
 package frc.robot;
 
@@ -36,7 +37,7 @@ import frc.robot.subsystems.OuttakeAngle;
 public class RobotContainer {
 
     // Subsystems
-    private final Intake intake = new Intake(18);
+    private final Intake intake = new Intake(18, 1);
     private final OuttakeAngle outtakeAngle = new OuttakeAngle(5);
     private final CANdleSubsystem lights = new CANdleSubsystem(0);
 
@@ -101,6 +102,18 @@ public class RobotContainer {
                     .withVelocityY(-joystick.getLeftX() * MaxSpeed)
                     .withRotationalRate(-joystick.getRightX() * MaxAngularRate)
             )
+        );
+
+        intake.setDefaultCommand(
+            intake.run(() -> {
+                double out = joystick.getRightTriggerAxis();
+
+                if (out < 0.05) {
+                    intake.stop();
+                } else {
+                    intake.set(-out);
+                }
+            })
         );
 
 
