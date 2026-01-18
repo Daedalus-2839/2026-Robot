@@ -81,7 +81,7 @@ public class RobotContainer {
 
     private void configureBindings() {
         
-        // Auto Align R1, Variable Shooter Control R2
+        // Auto Align R1
         joystick.rightBumper().whileTrue(
             new AimAndShoot(
                 drivetrain,
@@ -104,6 +104,7 @@ public class RobotContainer {
             )
         );
 
+        // Manual Intake R2
         intake.setDefaultCommand(
             intake.run(() -> {
                 double out = joystick.getRightTriggerAxis();
