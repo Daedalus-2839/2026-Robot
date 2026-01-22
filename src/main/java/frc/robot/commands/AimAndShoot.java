@@ -5,6 +5,7 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.DriverStation;
+// import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.LimelightHelpers;
@@ -23,11 +24,12 @@ public class AimAndShoot extends Command {
     private final BooleanSupplier autoButton;
     private final double deadbandDeg;
     private final CANdleSubsystem lights;
+    // private final Field2d m_field = new Field2d();
 
     // Allow moving relative to self
     private final SwerveRequest.RobotCentric m_request = new SwerveRequest.RobotCentric();
     
-    private final PIDController turnPID = new PIDController(4.0, 0.0, 0.3);
+    private final PIDController turnPID = new PIDController(0.2, 0.0, 0.3);
 
     private static final double DEAD_BAND = 4;
     private static final double ANGLE_MIN = 20.0;
@@ -87,10 +89,14 @@ public AimAndShoot(CommandSwerveDrivetrain drivetrain, Intake intake,
 
     @Override
     public void execute() {
+
+        // m_field.setRobotPose(getAverageBotPose());
+        // SmartDashboard.putData("Field Location (ONLYWHILEALIGNING)", m_field);
+
         double omega = 0.0;
         Pose2d botPose = getAverageBotPose();
-        Pose2d botPoseLog = botPose;
-        SmartDashboard.putString("AverageBotPose", botPoseLog.toString());
+        // Pose2d botPoseLog = botPose;
+        // SmartDashboard.putString("AverageBotPose", botPoseLog.toString());
         // Use previous position if unknown (I don't actually know if this will work or not)
         if(botPose == null && lastKnownPose != null) botPose = lastKnownPose;
 
