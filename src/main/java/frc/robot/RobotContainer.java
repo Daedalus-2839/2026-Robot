@@ -39,9 +39,11 @@ import frc.robot.subsystems.OuttakeAngle;
 public class RobotContainer {
 
     // Subsystems
-    private final Intake intake = new Intake(18, 1);
-    private final OuttakeAngle outtakeAngle = new OuttakeAngle(5);
+    private final Intake intake = new Intake(26, 24);
+    private final OuttakeAngle outtakeAngle = new OuttakeAngle(27);
     private final CANdleSubsystem lights = new CANdleSubsystem(0);
+
+    private final double SpeedReduction = 0.5;
 
     // Ignore the following Codeblock
     private double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond);
@@ -100,9 +102,9 @@ public class RobotContainer {
         // Drivebase Controls
         drivetrain.setDefaultCommand(
             drivetrain.applyRequest(() ->
-                drive.withVelocityX(-joystick.getLeftY() * MaxSpeed)
-                    .withVelocityY(-joystick.getLeftX() * MaxSpeed)
-                    .withRotationalRate(-joystick.getRightX() * MaxAngularRate)
+                drive.withVelocityX(-joystick.getLeftY() * MaxSpeed * SpeedReduction)
+                    .withVelocityY(-joystick.getLeftX() * MaxSpeed * SpeedReduction)
+                    .withRotationalRate(-joystick.getRightX() * MaxAngularRate * SpeedReduction)
             )
         );
 
