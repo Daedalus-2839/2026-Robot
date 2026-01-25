@@ -8,41 +8,39 @@ package frc.robot;
 import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.RadiansPerSecond;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
-
-import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
+import com.ctre.phoenix6.hardware.CANdle;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
 import com.pathplanner.lib.commands.FollowPathCommand;
-
+import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.wpilibj.Encoder;
-import edu.wpi.first.wpilibj.motorcontrol.PWMVictorSPX;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import edu.wpi.first.wpilibj.util.Color;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 import frc.robot.commands.AimAndShoot;
-import frc.robot.commands.AimAndShoot.LimelightConfig;
-import frc.robot.commands.CameraLightCycle;
+import frc.robot.commands.TrackCode;
+import frc.robot.commands.EstimatePose;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CANdleSubsystem;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.Intake;
-import frc.robot.subsystems.OuttakeAngle;
-
+import frc.robot.subsystems.ShooterLinearActuator;
+import frc.robot.subsystems.WebServer;
 @SuppressWarnings("unused")
 public class RobotContainer {
 
     // Subsystems
     private final Intake intake = new Intake(26, 24);
-    private final OuttakeAngle outtakeAngle = new OuttakeAngle(27);
+    // When using limit switches, the channels are on the RIO directly on the left and I think the text to the right is the channel
+    private final ShooterLinearActuator ShooterLinearActuator = new ShooterLinearActuator(27, 0, 1);
     private final CANdleSubsystem lights = new CANdleSubsystem(0);
+    private final WebServer webServer = new WebServer();
 
     private final double SpeedReduction = 0.5;
 
@@ -69,9 +67,10 @@ public class RobotContainer {
             new AimAndShoot(
                 drivetrain,
                 intake,
-                outtakeAngle,
+                ShooterLinearActuator,
                 lights,
-                () -> joystick.rightBumper().getAsBoolean()
+                () -> true,
+                joystick
             )
         );
 
@@ -79,6 +78,15 @@ public class RobotContainer {
             "ZeroRobotBase",
             drivetrain.runOnce(() -> drivetrain.seedFieldCentric()
         ));
+
+        NamedCommands.registerCommand(
+            "LimelightSync",
+            new EstimatePose(
+                lights,
+                drivetrain,
+                AimAndShoot.LIMELIGHTS
+            ).withTimeout(5.0)
+        );
 
         autoChooser = AutoBuilder.buildAutoChooser("Taxi");SmartDashboard.putData("Auto Mode", autoChooser);
         configureBindings();CommandScheduler.getInstance().schedule(FollowPathCommand.warmupCommand());
@@ -91,20 +99,23 @@ public class RobotContainer {
             new AimAndShoot(
                 drivetrain,
                 intake,
-                outtakeAngle,
+                ShooterLinearActuator,
                 lights,
-                () -> false
+                () -> true,
+                joystick
             )
         );
 
+        new Trigger(() -> joystick.getLeftTriggerAxis() > 0.5).whileTrue(new TrackCode(drivetrain));
+
         // Zero Robot Drivebase
-        joystick.leftBumper().onTrue(drivetrain.runOnce(() -> drivetrain.seedFieldCentric()));
+        joystick.start().onTrue(drivetrain.runOnce(() -> drivetrain.seedFieldCentric()));
 
         joystick.leftBumper().whileTrue(
-            new CameraLightCycle(
+            new EstimatePose(
                 lights,
-                AimAndShoot.LIMELIGHTS,
-                () -> joystick.leftTrigger().getAsBoolean()
+                drivetrain,
+                AimAndShoot.LIMELIGHTS
             )
         );
 

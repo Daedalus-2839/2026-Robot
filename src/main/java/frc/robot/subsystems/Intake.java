@@ -10,6 +10,9 @@ public class Intake extends SubsystemBase {
 
     private static final double DEADBAND = 0;
 
+    private static final double MAX_SPEED = 1;
+    private static final double MIN_SPEED = -1;
+
     public Intake(int motorACANId, int motorBCANId) {
         motorA = new TalonFX(motorACANId);
         motorB = new TalonFX(motorBCANId);
@@ -19,6 +22,8 @@ public class Intake extends SubsystemBase {
     }
 
     public void set(double speed) {
+        if (speed > MAX_SPEED) speed = 1.0;
+        if (speed < MIN_SPEED) speed = -1.0;
         UnpaidIntern.setPercentWithDeadband(motorA, speed, DEADBAND);
         UnpaidIntern.setPercentWithDeadband(motorB, speed, DEADBAND);
     }
