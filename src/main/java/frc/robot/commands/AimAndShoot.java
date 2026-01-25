@@ -3,13 +3,19 @@ package frc.robot.commands;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.GenericHID.RumbleType;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.LimelightHelpers;
 import frc.robot.subsystems.CANdleSubsystem;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.Intake;
-import frc.robot.subsystems.OuttakeAngle;
+import frc.robot.subsystems.ShooterLinearActuator;
+import frc.robot.subsystems.WebServer;
+
+import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
+import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 
 import java.util.function.BooleanSupplier;
 
@@ -17,24 +23,26 @@ public class AimAndShoot extends Command {
 
     private final CommandSwerveDrivetrain drivetrain;
     private final Intake intake;
-    private final OuttakeAngle outtakeAngle;
+    private final ShooterLinearActuator ShooterLinearActuator;
     private final BooleanSupplier autoButton;
     private final CANdleSubsystem lights;
-    private final SwerveRequest.RobotCentric m_request = new SwerveRequest.RobotCentric();
+    private final CommandXboxController joystick;
+    private PolynomialSplineFunction intakeSpeedSpline;
+    private PolynomialSplineFunction shooterAngleSpline;
+    private final SwerveRequest.RobotCentric drive = new SwerveRequest.RobotCentric();
 
-    private static final double DEAD_BAND = 4;
-    private static final double kP = 0.1; //0.9
-
-    private static final double FIRSTPOS = 0.4;
-    private static final double MAXPOS = 0.9;
+    private static final double SWERVE_ALIGN_DEADBAND = 4;
+    private static final double INTAKE_ANGLE_DEADBAND = 0.005;
+    private static final double kP = 0.1;
 
     // Meters
     private static final double BLUE_HOPPER_X = 4.626;
     private static final double BLUE_HOPPER_Y = 8.069;
     private static final double RED_HOPPER_X = 11.834;
-    private static final double RED_HOPPER_Y = 4.069;
+    private static final double RED_HOPPER_Y = 8.069;
 
     private static boolean autoIntakeLightsEnabled = true;
+    private static boolean allowAlignDriveControl = true;
 
     public static class LimelightConfig {
         String name; double x, y, z, roll, pitch, yaw;
@@ -49,15 +57,22 @@ public class AimAndShoot extends Command {
     };
 
     public AimAndShoot(CommandSwerveDrivetrain drivetrain, Intake intake,
-                       OuttakeAngle outtakeAngle, CANdleSubsystem lights,
-                       BooleanSupplier autoButton) {
+                       ShooterLinearActuator ShooterLinearActuator, CANdleSubsystem lights,
+                       BooleanSupplier autoButton, CommandXboxController joystick) {
         this.drivetrain = drivetrain;
         this.intake = intake;
-        this.outtakeAngle = outtakeAngle;
+        this.ShooterLinearActuator = ShooterLinearActuator;
         this.autoButton = autoButton;
         this.lights = lights;
+        this.joystick = joystick;
 
-        addRequirements(drivetrain, intake, outtakeAngle, lights);
+        addRequirements(drivetrain, intake, ShooterLinearActuator, lights);
+
+        double[] distances = {0.0, 1.0, 2.0, 3.0, 4.0, 5.0};
+        double[] speeds = {0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
+        double[] angles = {5, 10, 18, 25, 32, 38};
+        intakeSpeedSpline = new SplineInterpolator().interpolate(distances, speeds);
+        shooterAngleSpline = new SplineInterpolator().interpolate(distances, angles);
 
         // Apply Robot Offset
         for(LimelightConfig cam : LIMELIGHTS){
@@ -70,6 +85,21 @@ public class AimAndShoot extends Command {
     @Override
     public void execute() {
 
+        // For drivebase movement when aligning
+        double xSpeed;
+        if (allowAlignDriveControl) {
+            xSpeed = joystick.getLeftX();
+        } else {
+            xSpeed = 0;
+        }
+
+        double ySpeed;
+        if (allowAlignDriveControl) {
+            ySpeed = joystick.getLeftY();
+        } else {
+            ySpeed = 0;
+        }
+
         DriverStation.Alliance alliance = DriverStation.getAlliance().orElse(DriverStation.Alliance.Blue);
 
         boolean usingVision = false;
@@ -81,7 +111,7 @@ public class AimAndShoot extends Command {
 
             ll = LimelightHelpers.getBotPoseEstimate_wpiBlue(cam.name);
 
-            if (ll != null && ll.tagCount >= 1) {
+            if (ll != null && ll.pose != null && ll.tagCount >= 1) {
                 drivetrain.addVisionMeasurement(ll.pose, ll.timestampSeconds);
                 usingVision = true;
             }
@@ -90,8 +120,8 @@ public class AimAndShoot extends Command {
         SmartDashboard.putBoolean("UsingVision", usingVision);
 
         if (autoIntakeLightsEnabled) {
-            if (usingVision) lights.setColor(0, 255, 0);
-            else lights.setColor(255, 120, 0);
+            if (usingVision) { lights.setColor(0, 255, 0); joystick.setRumble(RumbleType.kRightRumble, 0); }
+            else { lights.setColor(255, 120, 0); joystick.setRumble(RumbleType.kRightRumble, 0.5); }
         }
 
         Pose2d poseToUse = drivetrain.getPose();
@@ -111,35 +141,44 @@ public class AimAndShoot extends Command {
         double botPoseY = poseToUse.getY();
         double botRot = poseToUse.getRotation().getDegrees();
 
-        SmartDashboard.putNumber("botPoseX", botPoseX);
-        SmartDashboard.putNumber("botPoseY", botPoseY);
+        WebServer.putNumber("botPoseX", botPoseX);
+        WebServer.putNumber("botPoseY", botPoseY);
 
         double dx = hopperX - botPoseX;
         double dy = hopperY - botPoseY;
 
         double r = Math.sqrt(dx*dx + dy*dy);
-        SmartDashboard.putNumber("Distance from Hopper", r);
+        WebServer.putNumber("DistancefromHopper", r);
 
         double omega = Math.toDegrees(Math.atan2(dy, dx));
-        SmartDashboard.putNumber("Omega", omega);
+        WebServer.putNumber("Omega", omega);
 
         double error = omega - botRot;
         if (error > 180) error -= 360;
         else if (error < -180) error += 360;
 
         double appliedOmega = error * kP;
-        SmartDashboard.putNumber("AppliedOmega", appliedOmega);
+        WebServer.putNumber("AppliedOmega", appliedOmega);
 
-        if (autoButton.getAsBoolean() && Math.abs(error) < DEAD_BAND) {
-            double targetInputSpeed = lerp(FIRSTPOS, MAXPOS, r);
-            intake.set(targetInputSpeed);
-            SmartDashboard.putNumber("intakeSpeed", targetInputSpeed);
+        if (autoButton.getAsBoolean() && Math.abs(error) < SWERVE_ALIGN_DEADBAND) {
+            double targetInputSpeed = intakeSpeedSpline.value(r);
+            double targetShooterAngle = shooterAngleSpline.value(r);
+
+            if (ShooterLinearActuator.isAtTarget(targetShooterAngle, INTAKE_ANGLE_DEADBAND)) {
+                intake.set(targetInputSpeed);
+            } else {
+                intake.set(0.0);
+                ShooterLinearActuator.setPosition(targetShooterAngle);
+            }
+
+            WebServer.putNumber("intakeSpeed", targetInputSpeed);
+            WebServer.putNumber("targetShooterAngle", targetShooterAngle);
         } else {
             intake.stop();
         }
 
         // Apply Drivetrain Control
-        drivetrain.setControl(m_request.withVelocityX(0).withVelocityY(0).withRotationalRate(appliedOmega));
+        drivetrain.setControl(drive.withVelocityX(xSpeed).withVelocityY(ySpeed).withRotationalRate(appliedOmega));
         SmartDashboard.putBoolean("isAutoActive", true);
     }
 
@@ -148,17 +187,12 @@ public class AimAndShoot extends Command {
         for(LimelightConfig cam : LIMELIGHTS){
             LimelightHelpers.setLEDMode_ForceOff(cam.name);
         }
-        drivetrain.setControl(m_request.withRotationalRate(0));
+        drivetrain.setControl(drive.withRotationalRate(0));
         intake.stop();
-        outtakeAngle.stop();
+        ShooterLinearActuator.stop();
         SmartDashboard.putBoolean("isAutoActive", false);
     }
 
     @Override
     public boolean isFinished(){ return false; }
-
-    // In the future I need to make a multiple point LERP
-    public double lerp(double v0, double v1, double vn) {
-        return v0 + vn * (v1 - v0);
-    }
 }
