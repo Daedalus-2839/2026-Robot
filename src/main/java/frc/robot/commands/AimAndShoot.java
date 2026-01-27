@@ -162,6 +162,7 @@ public class AimAndShoot extends Command {
 
         if (autoButton.getAsBoolean() && Math.abs(error) < SWERVE_ALIGN_DEADBAND) {
             double targetInputSpeed = intakeSpeedSpline.value(r);
+            // May or may not work, I should problably make the value correspond to an angle and a speed but both as one would be simpler.
             double targetShooterAngle = shooterAngleSpline.value(r);
 
             if (ShooterLinearActuator.isAtTarget(targetShooterAngle, INTAKE_ANGLE_DEADBAND)) {
@@ -178,6 +179,7 @@ public class AimAndShoot extends Command {
         }
 
         // Apply Drivetrain Control
+        // Note for later : Set to negative if it goes the wrong direction. RobotContainer has it inversed already
         drivetrain.setControl(drive.withVelocityX(xSpeed).withVelocityY(ySpeed).withRotationalRate(appliedOmega));
         SmartDashboard.putBoolean("isAutoActive", true);
     }
