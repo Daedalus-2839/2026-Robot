@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+
+<style>
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #000;
+  font-family: Verdana, sans-serif;
+  overflow: hidden;
+}
+
+.wrapper {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+}
+
+.background {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: blur(6px);
+}
+
+.overlay {
+  position: relative;
+  inset: 0;
+  z-index: 2;
+  color: white;
+  padding: 24px;
+  flex: 1;
+  margin: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+svg {
+  display: block;
+  font: 20em 'Montserrat';
+  width: 1400px;
+  height: 500px;
+}
+
+.text-copy {
+  fill: none;
+  stroke: white;
+  stroke-dasharray: 6% 29%;
+  stroke-width: 5px;
+  animation: stroke-offset 5.5s infinite linear;
+}
+
+.text-copy:nth-child(1) {
+  stroke: #FFD700;
+  animation-delay: -1s;
+}
+
+.text-copy:nth-child(2) {
+  stroke: #847900;
+  animation-delay: -2s;
+}
+
+.text-copy:nth-child(3) {
+  stroke: #DAA520;
+  animation-delay: -3s;
+}
+
+.text-copy:nth-child(4) {
+  stroke: #FF8C00;
+  animation-delay: -4s;
+}
+
+@keyframes stroke-offset {
+  100% {
+    stroke-dashoffset: -35%;
+  }
+}
+.bar {
+  width: 300px;
+  height: 16px;
+  min-height: 10px;
+  background: #2222226e;
+  border: 1px solid #555;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 6px 0 14px;
+}
+
+.bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #FFD700, #FF8C00);
+  transition: width 0.1s linear;
+}
+</style>
+</head>
+
+<body>
+
+<div style="display:flex;" class="wrapper">
+  <div class="background">
+    <svg viewBox="0 0 960 300">
+      <symbol id="s-text">
+        <text text-anchor="middle" x="50%" y="80%">2839</text>
+      </symbol>
+
+      <g>
+        <use href="#s-text" class="text-copy"></use>
+        <use href="#s-text" class="text-copy"></use>
+        <use href="#s-text" class="text-copy"></use>
+        <use href="#s-text" class="text-copy"></use>
+      </g>
+    </svg>
+  </div>
+  <div style="display:flex;width:30%;flex:1;" class="overlay">
+    <p id="status">Loading...</p>
+    <h3>Auto Align Stats</h3>
+    <p>Distance from Hopper: <span id="DistancefromHopper">0</span></p>
+    <p>Omega: <span id="Omega">0</span></p>
+    <p>Applied Omega: <span id="AppliedOmega">0</span></p>
+    <p>targetShooterAngle: <span id="targetShooterAngle">0</span></p>
+    <h3>Track Code Stats</h3>
+    <p>VX: <span id="TCvx">0</span></p>
+    <p>VY: <span id="TCvy">0</span></p>
+    <p>Omega: <span id="TComega">0</span></p>
+  </div>
+  <div style="display:flex;width:30%;flex:1;" class="overlay">
+  <br>
+  	<p>TargetSpeed: <span id="TargetSpeed">0</span></p>
+  	<div class="bar">
+    <div class="bar-fill" id="TargetSpeedBar"></div>
+    </div>
+	<p>BeltSpeed: <span id="BeltSpeed">0</span></p>
+    <div class="bar">
+    <div class="bar-fill" id="BeltSpeedBar"></div>
+    </div>
+    <p>ShooterBSpeed: <span id="ShooterBSpeed">0</span></p>
+    <div class="bar">
+    <div class="bar-fill" id="ShooterBSpeedBar"></div>
+    </div>
+    <p>ShooterCSpeed: <span id="ShooterCSpeed">0</span></p>
+    <div class="bar">
+    <div class="bar-fill" id="ShooterCSpeedBar"></div>
+    </div>
+  </div>
+  <div style="display:flex;width:30%;flex:1;" class="overlay">
+    <h3>Auto Chooser</h3>
+	<select id="autoChooser"></select>
+  </div>
+</div>
+
+<script>
+const limits = {
+  TargetSpeed: 100,
+  BeltSpeed: 6000,
+  ShooterBSpeed: 6000,
+  ShooterCSpeed: 6000
+};
+
+async function updateDashboard() {
+try {
+    const res = await fetch('/data');
+    const data = await res.json();
+
+    for (const key in data) {
+      const valueEl = document.getElementById(key);
+      if (valueEl) valueEl.innerText = data[key];
+
+      const bar = document.getElementById(key + "Bar");
+      if (bar && limits[key] !== undefined) {
+        const percent = Math.min(
+          Math.abs(data[key]) / limits[key] * 100,
+          100
+        );
+        bar.style.width = percent + "%";
+      }
+    }
+  document.getElementById("status").innerHTML = '<p style="color:lightgreen;">Connected</p> ' + new Date().toLocaleTimeString();
+  } catch (err) {
+  document.getElementById("status").innerHTML = '<p style="color:red;">Disconnected</p> ';
+  }
+}
+
+setInterval(updateDashboard, 100);
+
+async function updateAutoChooser() {
+    try {
+        const res = await fetch('/autos');
+        const data = await res.json();
+        const select = document.getElementById('autoChooser');
+        select.innerHTML = '';
+        for (const [name, val] of Object.entries(data.options)) {
+            const opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = name;
+            if (val === data.selected) opt.selected = true;
+            select.appendChild(opt);
+        }
+    } catch (err) {
+        console.error('Failed to load autos', err);
+    }
+}
+
+document.getElementById('autoChooser').addEventListener('change', e => {
+    fetch('/setAuto?auto=' + e.target.value);
+});
+
+setInterval(updateAutoChooser, 1000);
+
+</script>
+</body>
+</html>

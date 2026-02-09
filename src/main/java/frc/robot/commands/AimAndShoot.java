@@ -1,0 +1,208 @@
+package frc.robot.commands;
+
+import com.ctre.phoenix6.swerve.SwerveRequest;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.GenericHID.RumbleType;
+import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj2.command.Command;
+import frc.robot.LimelightHelpers;
+import frc.robot.subsystems.CANdleSubsystem;
+import frc.robot.subsystems.CommandSwerveDrivetrain;
+import frc.robot.subsystems.Shooter;
+import frc.robot.subsystems.ShooterLinearActuator;
+import frc.robot.subsystems.WebServer;
+import frc.robot.Constants;
+
+import org.apache.commons.math3.analysis.interpolation.AkimaSplineInterpolator;
+import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
+
+import java.util.function.BooleanSupplier;
+
+public class AimAndShoot extends Command {
+
+    private final CommandSwerveDrivetrain drivetrain;
+    private final Shooter shooter;
+    private final ShooterLinearActuator ShooterLinearActuator;
+    private final BooleanSupplier autoButton;
+    private final CANdleSubsystem lights;
+    private final XboxController joystick;
+    private PolynomialSplineFunction intakeSpeedSpline;
+    private PolynomialSplineFunction shooterAngleSpline;
+    private final SwerveRequest.RobotCentric drive = new SwerveRequest.RobotCentric();
+
+    private static final double SWERVE_ALIGN_DEADBAND = 4;
+    private static final double INTAKE_ANGLE_DEADBAND = 0.005;
+    private static final double kP = 0.1;
+
+    // Meters
+    private static final double BLUE_HOPPER_X = 4.626;
+    private static final double BLUE_HOPPER_Y = 8.069;
+    private static final double RED_HOPPER_X = 11.834;
+    private static final double RED_HOPPER_Y = 8.069;
+
+    private static boolean autoIntakeLightsEnabled = true;
+    private static boolean allowAlignDriveControl = true;
+
+    public static final Constants.Limelight.LimelightConfig[] LIMELIGHTS = Constants.Limelight.LIMELIGHTS;
+
+    public AimAndShoot(CommandSwerveDrivetrain drivetrain, Shooter shooter,
+                       ShooterLinearActuator ShooterLinearActuator, CANdleSubsystem lights,
+                       BooleanSupplier autoButton, XboxController joystick) {
+        this.drivetrain = drivetrain;
+        this.shooter = shooter;
+        this.ShooterLinearActuator = ShooterLinearActuator;
+        this.autoButton = autoButton;
+        this.lights = lights;
+        this.joystick = joystick;
+
+
+        addRequirements(drivetrain, shooter, ShooterLinearActuator, lights);
+
+        double[] distances = Constants.Trajectory.distances;
+        double[] speeds = Constants.Trajectory.speeds;
+        double[] angles = Constants.Trajectory.angles;
+
+        intakeSpeedSpline = new AkimaSplineInterpolator().interpolate(distances, speeds);
+        shooterAngleSpline = new AkimaSplineInterpolator().interpolate(distances, angles);
+
+        for(Constants.Limelight.LimelightConfig cam : LIMELIGHTS){
+            LimelightHelpers.setCameraPose_RobotSpace(
+                cam.name, cam.x, cam.y, cam.z, cam.roll, cam.pitch, cam.yaw
+            );
+        }
+    }
+
+    @Override
+    public void execute() {
+
+        // For drivebase movement when aligning
+        double xSpeed;
+        if (allowAlignDriveControl) {
+            xSpeed = joystick.getLeftX();
+        } else {
+            xSpeed = 0;
+        }
+
+        double ySpeed;
+        if (allowAlignDriveControl) {
+            ySpeed = joystick.getLeftY();
+        } else {
+            ySpeed = 0;
+        }
+
+        DriverStation.Alliance alliance = DriverStation.getAlliance().orElse(DriverStation.Alliance.Blue);
+
+        boolean usingVision = false;
+
+        LimelightHelpers.PoseEstimate ll;
+
+        for(Constants.Limelight.LimelightConfig cam : LIMELIGHTS){
+            if (Constants.Limelight.ENABLE_LIMELIGHT_LIGHTS) {
+            LimelightHelpers.setLEDMode_ForceOn(cam.name);
+            }
+
+            ll = LimelightHelpers.getBotPoseEstimate_wpiBlue(cam.name);
+
+            if (ll != null && ll.pose != null && ll.tagCount >= 1) {
+                drivetrain.addVisionMeasurement(ll.pose, ll.timestampSeconds);
+                usingVision = true;
+            }
+        }
+
+        SmartDashboard.putBoolean("UsingVision", usingVision);
+
+        if (autoIntakeLightsEnabled) {
+            if (usingVision) { lights.setColor(0, 255, 0); joystick.setRumble(RumbleType.kRightRumble, 0.2); joystick.setRumble(RumbleType.kLeftRumble, 0.2); }
+            else { lights.setColor(255, 120, 0); joystick.setRumble(RumbleType.kRightRumble, 0.2); joystick.setRumble(RumbleType.kLeftRumble, 0.2); }
+        }
+
+        Pose2d poseToUse = drivetrain.getPose();
+
+        double hopperX, hopperY;
+        if (alliance == DriverStation.Alliance.Blue) {
+            hopperX = BLUE_HOPPER_X;
+            hopperY = BLUE_HOPPER_Y;
+            SmartDashboard.putString("Alliance", "BLUE");
+        } else {
+            hopperX = RED_HOPPER_X;
+            hopperY = RED_HOPPER_Y;
+            SmartDashboard.putString("Alliance", "RED");
+        }
+
+        double botPoseX = poseToUse.getX();
+        double botPoseY = poseToUse.getY();
+        double botRot = poseToUse.getRotation().getDegrees();
+
+        WebServer.putNumber("botPoseX", botPoseX);
+        WebServer.putNumber("botPoseY", botPoseY);
+
+        double dx = hopperX - botPoseX;
+        double dy = hopperY - botPoseY;
+
+        double r = Math.sqrt(dx*dx + dy*dy);
+        WebServer.putNumber("DistancefromHopper", r);
+
+        double omega = Math.toDegrees(Math.atan2(dy, dx));
+        WebServer.putNumber("Omega", omega);
+
+        double error = omega - botRot;
+        if (error > 180) error -= 360;
+        else if (error < -180) error += 360;
+
+        double appliedOmega = error * kP;
+        WebServer.putNumber("AppliedOmega", appliedOmega);
+
+        if (autoButton.getAsBoolean() && Math.abs(error) < SWERVE_ALIGN_DEADBAND) {
+            try { 
+
+            double targetInputSpeed = intakeSpeedSpline.value(r);
+            double targetShooterAngle = shooterAngleSpline.value(r);
+
+            if (ShooterLinearActuator.isAtTarget(targetShooterAngle, INTAKE_ANGLE_DEADBAND)) {
+                shooter.set(targetInputSpeed);
+            } else {
+                shooter.set(0.0);
+                ShooterLinearActuator.setPosition(targetShooterAngle);
+            }
+
+            WebServer.putNumber("intakeSpeed", targetInputSpeed);
+            WebServer.putNumber("targetShooterAngle", targetShooterAngle);
+
+            } catch(Exception e) {
+            System.out.println("Issue Calculating Trajectory: "+e.getMessage());
+            }
+
+        } else {
+            shooter.stop();
+        }
+
+        if (joystick.getRightTriggerAxis() >= 0.2) {
+            shooter.set(joystick.getRightTriggerAxis());
+            ShooterLinearActuator.setPosition(joystick.getRightTriggerAxis());
+
+            WebServer.putNumber("intakeSpeed", joystick.getRightTriggerAxis());
+            WebServer.putNumber("targetShooterAngle", joystick.getRightTriggerAxis());
+        }
+
+        drivetrain.setControl(drive.withVelocityX(xSpeed).withVelocityY(ySpeed).withRotationalRate(appliedOmega));
+        SmartDashboard.putBoolean("isAutoActive", true);
+    }
+
+    @Override
+    public void end(boolean interrupted){
+        for(Constants.Limelight.LimelightConfig cam : LIMELIGHTS){
+            LimelightHelpers.setLEDMode_ForceOff(cam.name);
+        }
+        drivetrain.setControl(drive.withRotationalRate(0));
+        joystick.setRumble(RumbleType.kRightRumble, 0);
+        joystick.setRumble(RumbleType.kLeftRumble, 0);
+        shooter.stop();
+        ShooterLinearActuator.stop();
+        SmartDashboard.putBoolean("isAutoActive", false);
+    }
+
+    @Override
+    public boolean isFinished(){ return false; }
+}
