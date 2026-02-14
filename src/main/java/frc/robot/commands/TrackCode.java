@@ -9,19 +9,22 @@ import frc.robot.LimelightHelpers;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.Constants;
 import frc.robot.subsystems.WebServer;
+import frc.robot.subsystems.CANdleSubsystem;
 
 public class TrackCode extends Command {
 
     private final CommandSwerveDrivetrain drivetrain;
     private final SwerveRequest.RobotCentric drive = new SwerveRequest.RobotCentric();
+    private final CANdleSubsystem lights;
+    private final boolean usingLights;
 
     double vx; double vy; double omega;
     
     private static final double kP_DIST = 1;
-    private static final double kP_STRAFE = 0.2;
+    private static final double kP_STRAFE = 0.1;
     private static final double kP_ROT = 4;
 
-    private static final double MAX_VEL = 3.0;
+    private static final double MAX_VEL = 8.0;
     private static final double MAX_OMEGA = 10;
 
     private static final double GUESS_REDUCTION_MPL = 0.7;
@@ -35,15 +38,17 @@ public class TrackCode extends Command {
 
     private final XboxController joystick;
 
-    public TrackCode(CommandSwerveDrivetrain drivetrain, XboxController joystick) {
+    public TrackCode(CommandSwerveDrivetrain drivetrain, XboxController joystick, CANdleSubsystem lights, boolean usingLights) {
         this.drivetrain = drivetrain;
         this.joystick = joystick;
+        this.lights = lights;
+        this.usingLights = usingLights;
         addRequirements(drivetrain);
     }
 
     @Override
     public void execute() {
-        if (Constants.Limelight.ENABLE_LIMELIGHT_LIGHTS) {
+        if (Constants.Limelight.ENABLE_LIMELIGHT_LIGHTS && usingLights) {
         LimelightHelpers.setLEDMode_ForceOn("limelight-front");
         }
 
@@ -55,6 +60,7 @@ public class TrackCode extends Command {
                 lastTime = now;
             }
             drivetrain.setControl(drive.withVelocityX(vx).withVelocityY(vy).withRotationalRate(omega));
+            lights.setColor(255, 0, 0);
             return;
         }
 
@@ -74,12 +80,14 @@ public class TrackCode extends Command {
         omega = Math.max(-MAX_OMEGA, Math.min(MAX_OMEGA, omega));
 
         drivetrain.setControl(drive.withVelocityX(vx).withVelocityY(vy).withRotationalRate(omega));
+        lights.setColor(0, 255, 0);
     }
 
     @Override
     public void end(boolean interrupted) {
         drivetrain.setControl(drive.withVelocityX(0).withVelocityY(0).withRotationalRate(0));
         LimelightHelpers.setLEDMode_ForceOff("limelight-front");
+        lights.setColor(0, 0, 0);
     }
 
     @Override

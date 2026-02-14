@@ -1,8 +1,12 @@
 package frc.robot.subsystems;
 
 import com.ctre.phoenix6.hardware.TalonFX;
+
+import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.Constants;
 import frc.robot.UnpaidIntern;
 import frc.robot.subsystems.WebServer;
 
@@ -11,6 +15,10 @@ public class Shooter extends SubsystemBase {
     private final TalonFX motorA;
     private final TalonFX motorB;
     private final TalonFX motorC;
+
+    double appliedBeltSpeed = 1;
+    double appliedShooterBSpeed = 1;
+    double appliedShooterCSpeed = 1;
 
     private static final double DEADBAND = 0;
     private static final double MAX_SPEED = 1;
@@ -21,7 +29,13 @@ public class Shooter extends SubsystemBase {
     private boolean beltStarted = false;
     private double currentSpeed = 0;
 
-    public Shooter(int beltMotorACANId, int shooterMotorBCANId, int shooterMotorCCANId) {
+    PIDController beltAPID = new PIDController(0.95, 0.9, 0);
+    PIDController shooterBPID = new PIDController(0.95, 0.9, 0);
+    PIDController shooterCPID = new PIDController(0.95, 0.9, 0);
+
+    double MAX_SPEED_RPM = 6000;
+
+    public Shooter(int shooterMotorBCANId, int shooterMotorCCANId, int beltMotorACANId) {
         motorA = new TalonFX(beltMotorACANId);
         motorB = new TalonFX(shooterMotorBCANId);
         motorC = new TalonFX(shooterMotorCCANId);
@@ -41,13 +55,12 @@ public class Shooter extends SubsystemBase {
         speed = clamp(speed);
         currentSpeed = speed;
 
-        WebServer.putNumber("TargetSpeed", speed*100);
-        WebServer.putNumber("BeltSpeed", motorA.getVelocity().getValueAsDouble());
-        WebServer.putNumber("ShooterBSpeed", motorB.getVelocity().getValueAsDouble());
-        WebServer.putNumber("ShooterCSpeed", motorC.getVelocity().getValueAsDouble());
+        WebServer.putNumber("BeltSpeed", motorA.getVelocity().getValueAsDouble()*(180/Math.PI));
+        WebServer.putNumber("ShooterBSpeed", motorB.getVelocity().getValueAsDouble()*(180/Math.PI));
+        WebServer.putNumber("ShooterCSpeed", motorC.getVelocity().getValueAsDouble()*(180/Math.PI));
 
-        UnpaidIntern.setPercentWithDeadband(motorB, speed, DEADBAND);
-        UnpaidIntern.setPercentWithDeadband(motorC, speed, DEADBAND);
+        UnpaidIntern.setPercentWithDeadband(motorB, speed*0.8, DEADBAND);
+        UnpaidIntern.setPercentWithDeadband(motorC, -speed, DEADBAND);
 
         if (!beltTimer.isRunning()) {
             beltTimer.reset();
@@ -61,10 +74,55 @@ public class Shooter extends SubsystemBase {
         }
     }
 
+    public void runRotationsAsController(double speed) {
+        speed = speed*MAX_SPEED_RPM;
+        matchRotations(speed);
+        System.out.println("RunRotationsAsControllerSpeed: "+speed);
+    }
+
+    public void matchRotations(double speed) {
+
+        // Convert RPS to RPM when fetching Velocity
+        double currentBeltSpeed = motorA.getVelocity().getValueAsDouble()*60;
+        double currentShooterBSpeed = motorB.getVelocity().getValueAsDouble()*60;
+        double currentShooterCSpeed = -motorC.getVelocity().getValueAsDouble()*60;
+
+        appliedBeltSpeed = 0.2*-clamp(((beltAPID.calculate(currentBeltSpeed/MAX_SPEED_RPM, speed/MAX_SPEED_RPM))));
+        appliedShooterBSpeed = clamp(((shooterBPID.calculate(currentShooterBSpeed/MAX_SPEED_RPM, speed/MAX_SPEED_RPM))));
+        appliedShooterCSpeed = -clamp(((shooterCPID.calculate(currentShooterCSpeed/MAX_SPEED_RPM, speed/MAX_SPEED_RPM))));
+
+        WebServer.putNumber("TargetSpeed", speed);
+        System.out.println("SentWebserver TargetSpeed: "+speed);
+        WebServer.putNumber("BeltSpeed", currentBeltSpeed);
+        System.out.println("SentWebserver BeltSpeed: "+currentBeltSpeed);
+        WebServer.putNumber("ShooterBSpeed", currentShooterBSpeed);
+        System.out.println("SentWebserver ShooterB: "+currentShooterBSpeed);
+        WebServer.putNumber("ShooterCSpeed", currentShooterCSpeed);
+        System.out.println("SentWebserver ShooterC: "+currentShooterCSpeed);
+
+        WebServer.putNumber("AppliedBeltSpeed", appliedBeltSpeed);
+        WebServer.putNumber("AppliedShooterBSpeed", appliedShooterBSpeed);
+        WebServer.putNumber("AppliedShooterCSpeed", appliedShooterCSpeed);
+
+        UnpaidIntern.setPercentWithDeadband(motorB, appliedShooterBSpeed, DEADBAND);
+        UnpaidIntern.setPercentWithDeadband(motorC, appliedShooterCSpeed, DEADBAND);
+
+        if (!beltTimer.isRunning()) {
+            beltTimer.reset();
+            beltTimer.start();
+            beltStarted = false;
+        }
+
+        if (beltTimer.hasElapsed(BELT_DELAY_SEC)) {
+            UnpaidIntern.setPercentWithDeadband(motorA, appliedBeltSpeed, DEADBAND);
+            beltStarted = true;
+        }
+    }
+
     @Override
     public void periodic() {
         if (beltStarted) {
-            UnpaidIntern.setPercentWithDeadband(motorA, currentSpeed, DEADBAND);
+            UnpaidIntern.setPercentWithDeadband(motorA, appliedBeltSpeed, DEADBAND);
         }
     }
 
@@ -76,6 +134,13 @@ public class Shooter extends SubsystemBase {
         UnpaidIntern.stop(motorA);
         UnpaidIntern.stop(motorB);
         UnpaidIntern.stop(motorC);
+        WebServer.putNumber("TargetSpeed", 0);
+        WebServer.putNumber("BeltSpeed", 0);
+        WebServer.putNumber("ShooterBSpeed", 0);
+        WebServer.putNumber("ShooterCSpeed", 0);
+        WebServer.putNumber("AppliedBeltSpeed", 0);
+        WebServer.putNumber("AppliedShooterBSpeed", 0);
+        WebServer.putNumber("AppliedShooterCSpeed", 0);
     }
 
     public void kill() {
