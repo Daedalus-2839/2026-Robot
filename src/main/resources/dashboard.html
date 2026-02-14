@@ -19,14 +19,12 @@ body {
 .wrapper {
   position: relative;
   width: 100%;
-  height: 100vh;
 }
 
 .background {
   position: absolute;
   inset: 0;
   z-index: 1;
-  display: flex;
   align-items: center;
   justify-content: center;
   filter: blur(6px);
@@ -47,8 +45,9 @@ body {
 svg {
   display: block;
   font: 20em 'Montserrat';
-  width: 1400px;
-  height: 500px;
+  width: 80%;
+  height: 300px;
+  margin-top:140px;
 }
 
 .text-copy {
@@ -101,18 +100,46 @@ svg {
   background: linear-gradient(90deg, #FFD700, #FF8C00);
   transition: width 0.1s linear;
 }
+.ac {
+    width: 300px;
+    height: 30px;
+    min-height: 10px;
+    background: #2222226e;
+    border: 1px solid #555;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 6px 0 14px;
+    color: white;
+}
+.tptext {
+  font-weight: 200;
+  color:rgba(255, 255, 255, 0.54);
+  -webkit-text-stroke: 0.2px #000000;
+  filter: drop-shadow(2px 4px 4px #3e3e3e)
+}
+.large {
+  font-weight: 400;
+  font-size: 20px;
+  color:rgba(255, 255, 255, 0.733);
+}
+canvas {
+  aspect-ratio: 1/1;
+  width:90%;
+  margin-top:20%;
+}
 </style>
 </head>
 
 <body>
 
-<div style="display:flex;" class="wrapper">
+  <div style="display:flex;" class="wrapper">
+  <center>
   <div class="background">
     <svg viewBox="0 0 960 300">
       <symbol id="s-text">
         <text text-anchor="middle" x="50%" y="80%">2839</text>
       </symbol>
-
+      
       <g>
         <use href="#s-text" class="text-copy"></use>
         <use href="#s-text" class="text-copy"></use>
@@ -120,65 +147,112 @@ svg {
         <use href="#s-text" class="text-copy"></use>
       </g>
     </svg>
+    <h1 style="font-weight:900;background:linear-gradient(rgb(235, 192, 18), rgb(0, 0, 0));-webkit-text-stroke: 2px #000000;font-size:100px; -webkit-background-clip: text;background-clip: text;-webkit-text-fill-color: transparent;">Daedalus</h1>
   </div>
+  </center>
   <div style="display:flex;width:30%;flex:1;" class="overlay">
     <p id="status">Loading...</p>
-    <h3>Auto Align Stats</h3>
-    <p>Distance from Hopper: <span id="DistancefromHopper">0</span></p>
-    <p>Omega: <span id="Omega">0</span></p>
-    <p>Applied Omega: <span id="AppliedOmega">0</span></p>
-    <p>targetShooterAngle: <span id="targetShooterAngle">0</span></p>
-    <h3>Track Code Stats</h3>
-    <p>VX: <span id="TCvx">0</span></p>
-    <p>VY: <span id="TCvy">0</span></p>
-    <p>Omega: <span id="TComega">0</span></p>
+    <h4 class="tptext large">Auto Align Stats</h4>
+    <div style="display:flex;">
+    <p class="tptext" style="margin-right:5px;"> &#916;:<span id="DistancefromHopper">0</span></p>
+    <p class="tptext" style="margin-right:5px;"> &#937;:<span id="Omega">0</span></p>
+    <p class="tptext" style="margin-right:5px;"> &#937;A:<span id="AppliedOmega">0</span></p>
+    </div>
+    <h4 class="tptext large">Track Code Stats</h4>
+    <div class="tptext" style="display:flex;">
+    <p class="tptext" style="margin-right:5px;">&#916;X:<span id="TCvx">0</span></p>
+    <p class="tptext" style="margin-right:5px;">&#916;Y:<span id="TCvy">0</span></p>
+    <p class="tptext" style="margin-right:5px;">&#937;:<span id="TComega">0</span></p>
+    </div>
   </div>
   <div style="display:flex;width:30%;flex:1;" class="overlay">
   <br>
-  	<p>TargetSpeed: <span id="TargetSpeed">0</span></p>
+  	<p class="tptext" >ControllerTargetSpeed: <span id="TargetSpeed">0</span></p>
+
   	<div class="bar">
     <div class="bar-fill" id="TargetSpeedBar"></div>
     </div>
-	<p>BeltSpeed: <span id="BeltSpeed">0</span></p>
+
+	  <p class="tptext" >BeltSpeed: <span id="BeltSpeed">0</span></p>
+
     <div class="bar">
     <div class="bar-fill" id="BeltSpeedBar"></div>
     </div>
-    <p>ShooterBSpeed: <span id="ShooterBSpeed">0</span></p>
+
+    <p class="tptext" >AppliedBeltSpeed: <span id="AppliedBeltSpeed">0</span></p>
+
+    <div class="bar">
+    <div class="bar-fill" id="AppliedBeltSpeedBar"></div>
+    </div>
+
+    <p class="tptext" >ShooterBSpeed: <span id="ShooterBSpeed">0</span></p>
+    
     <div class="bar">
     <div class="bar-fill" id="ShooterBSpeedBar"></div>
     </div>
-    <p>ShooterCSpeed: <span id="ShooterCSpeed">0</span></p>
+
+    <p class="tptext" >AppliedShooterBSpeed: <span id="AppliedShooterBSpeed">0</span></p>
+
+    <div class="bar">
+    <div class="bar-fill" id="AppliedShooterBSpeedBar"></div>
+    </div>
+    
+    <p class="tptext" >ShooterCSpeed: <span id="ShooterCSpeed">0</span></p>
+
     <div class="bar">
     <div class="bar-fill" id="ShooterCSpeedBar"></div>
     </div>
+
+    <p class="tptext" >AppliedShooterCSpeed: <span id="AppliedShooterCSpeed">0</span></p>
+
+    <div class="bar">
+    <div class="bar-fill" id="AppliedShooterCSpeedBar"></div>
+    </div>
+
   </div>
   <div style="display:flex;width:30%;flex:1;" class="overlay">
-    <h3>Auto Chooser</h3>
-	<select id="autoChooser"></select>
+    <h3 class="tptext" >Auto Chooser</h3>
+	<select class="ac" id="autoChooser"></select>
+  
+  <center><div id="robotBase" style="height:100px; width:100px; border: 2px solid #fff; background-color:transparent;margin-top:50px; margin-bottom: 50px;">^</div></center>
+
+  <p>Manual Shooter Speed:</p>
+  <input id="MESS_SPEED" type="text" placeholder="Speed (Rotations)">
+  <br>
+  <input id="MESS_TIME" type="text" placeholder="Time (Seconds)">
+  <br>
+  <button onclick="runObjectForTime('shooterSpeedRotations', document.getElementById('MESS_SPEED').value, document.getElementById('MESS_TIME').value)">Run Motors</button>
   </div>
+
 </div>
 
 <script>
 const limits = {
-  TargetSpeed: 100,
+  TargetSpeed: 6000,
   BeltSpeed: 6000,
   ShooterBSpeed: 6000,
-  ShooterCSpeed: 6000
+  ShooterCSpeed: 6000,
+  AppliedBeltSpeed: 1,
+  AppliedShooterBSpeed: 1,
+  AppliedShooterCSpeed: 1
 };
 
 async function updateDashboard() {
 try {
     const res = await fetch('/data');
-    const data = await res.json();
+    const dataDB = await res.json();
+    console.log("Recieved Data: "+dataDB);
 
-    for (const key in data) {
+    for (const key in dataDB) {
+      console.log("Key: "+key)
       const valueEl = document.getElementById(key);
-      if (valueEl) valueEl.innerText = data[key];
+      if (valueEl) valueEl.innerText = dataDB[key];
+      console.log(dataDB[key]);
 
       const bar = document.getElementById(key + "Bar");
       if (bar && limits[key] !== undefined) {
         const percent = Math.min(
-          Math.abs(data[key]) / limits[key] * 100,
+          Math.abs(dataDB[key]) / limits[key] * 100,
           100
         );
         bar.style.width = percent + "%";
@@ -186,6 +260,7 @@ try {
     }
   document.getElementById("status").innerHTML = '<p style="color:lightgreen;">Connected</p> ' + new Date().toLocaleTimeString();
   } catch (err) {
+  console.log("Caught Error: "+err);
   document.getElementById("status").innerHTML = '<p style="color:red;">Disconnected</p> ';
   }
 }
@@ -194,8 +269,8 @@ setInterval(updateDashboard, 100);
 
 async function updateAutoChooser() {
     try {
-        const res = await fetch('/autos');
-        const data = await res.json();
+        const resautos = await fetch('/autos');
+        const data = await resautos.json();
         const select = document.getElementById('autoChooser');
         select.innerHTML = '';
         for (const [name, val] of Object.entries(data.options)) {
@@ -214,8 +289,26 @@ document.getElementById('autoChooser').addEventListener('change', e => {
     fetch('/setAuto?auto=' + e.target.value);
 });
 
-setInterval(updateAutoChooser, 1000);
+setInterval(updateAutoChooser, 2000);
 
+async function runObjectForTime(target, value, time) {
+  try {
+  fetch('/set?target=' + target + '&value='+ value + '&time=' + time);
+  } catch (err) {
+  console.log(err);
+  }
+}
+
+var degree;
+
+async function setRobotRotation() {
+  request = await fetch("/rotations");
+  if (!request.ok) {return}
+  datarot = await request.json();
+  document.getElementById("robotBase").style.transform = `rotate(${datarot.degree}deg)`;
+}
+
+setInterval(setRobotRotation, 100);
 </script>
 </body>
 </html>

@@ -38,7 +38,6 @@ import frc.robot.generated.TunerConstants_Vulcan;
 import frc.robot.subsystems.CANdleSubsystem;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.Intake;
-import frc.robot.subsystems.ShooterLinearActuator;
 import frc.robot.subsystems.WebServer;
 import frc.robot.subsystems.Elevator;
 import frc.robot.subsystems.Shooter;
@@ -46,18 +45,15 @@ import frc.robot.subsystems.Shooter;
 public class RobotContainer {
 
     private static final String DRIVEBASE_TYPE = "vulcan"; // vulcan, 2026
-    private final Intake intake = new Intake(27, 26);
-    private final Shooter shooter = new Shooter(40, 41, 34);
-    // When using limit switches, the channels are on the RIO directly on the left and I think the text to the right is the channel
-    private final ShooterLinearActuator ShooterLinearActuator = new ShooterLinearActuator(27, 0, 1);
-    private final CANdleSubsystem lights = new CANdleSubsystem(0);
-    private final WebServer webServer = new WebServer();
+    private final Intake intake = new Intake(59, 60);
+    private final Shooter shooter = new Shooter(40, 26, 27);
+    public final CANdleSubsystem lights = new CANdleSubsystem(0);
     private final Elevator elevator = new Elevator(50, 30);
     private final XboxController joystick0 = new XboxController(0);
     private final XboxController joystick1 = new XboxController(1);
-
+    
     private final double SpeedReduction = 0.5;
-
+    
     private double MaxSpeed = TunerConstants_Vulcan.kSpeedAt12Volts.in(MetersPerSecond);
     private double MaxAngularRate = RotationsPerSecond.of(0.75).in(RadiansPerSecond);
     private final SwerveRequest.FieldCentric drive = new SwerveRequest.FieldCentric()
@@ -66,10 +62,11 @@ public class RobotContainer {
     private final SwerveRequest.SwerveDriveBrake brake = new SwerveRequest.SwerveDriveBrake();
     private final SwerveRequest.PointWheelsAt point = new SwerveRequest.PointWheelsAt();
     private final SwerveRequest.RobotCentric forwardStraight = new SwerveRequest.RobotCentric()
-            .withDriveRequestType(DriveRequestType.OpenLoopVoltage);
+    .withDriveRequestType(DriveRequestType.OpenLoopVoltage);
     private final Telemetry logger = new Telemetry(MaxSpeed);
-
+    
     public final CommandSwerveDrivetrain drivetrain = createDrivetrain();
+    private final WebServer webServer = new WebServer(drivetrain, shooter);
 
     private static CommandSwerveDrivetrain createDrivetrain() {
     switch (DRIVEBASE_TYPE) {
@@ -88,11 +85,12 @@ public class RobotContainer {
 
         // Autonomous Commands
 
-        NamedCommands.registerCommand("AutoAlignAndShoot",new AimAndShoot(drivetrain,shooter,ShooterLinearActuator,lights,() -> true,joystick0));
+        NamedCommands.registerCommand("AutoAlignAndShoot",new AimAndShoot(drivetrain,shooter,lights,() -> true,joystick0));
 
         NamedCommands.registerCommand("ZeroRobotBase",drivetrain.runOnce(() -> drivetrain.seedFieldCentric()));
 
-        NamedCommands.registerCommand("LimelightSync",new EstimatePose(lights,drivetrain).withTimeout(5.0));
+        // If we can't use limelight lights in Autos, switch using lights to false
+        NamedCommands.registerCommand("LimelightSync",new EstimatePose(lights,drivetrain,true).withTimeout(5.0));
 
 
         autoChooser = AutoBuilder.buildAutoChooser("Taxi");SmartDashboard.putData("Auto Mode", autoChooser);
@@ -104,22 +102,16 @@ public class RobotContainer {
         // Joystick0 - Main Driver Controller
 
         // Right Bymper - Automatic Aim and Shoot
-        new Trigger(() -> joystick0.getRightBumper()).whileTrue(new AimAndShoot(drivetrain,shooter,ShooterLinearActuator,lights,() -> true,joystick0));
+        new Trigger(() -> joystick0.getRightBumper()).whileTrue(new AimAndShoot(drivetrain,shooter,lights,() -> true,joystick0));
 
         // Left Bumper - Estimate Pose from Limelights
-        new Trigger(() -> joystick0.getLeftBumper()).whileTrue(new EstimatePose(lights,drivetrain));
+        new Trigger(() -> joystick0.getLeftBumper()).whileTrue(new EstimatePose(lights,drivetrain,true));
 
-        // D-Pad Up - Follow Code
-        new Trigger(() -> joystick0.getPOV() == 0).whileTrue(new TrackCode(drivetrain, joystick0));
-
-        // D-Pad Left - Elevator Up
-        new Trigger(() -> joystick0.getPOV() == 90).whileTrue(elevator.run(() -> elevator.set(0.5))).onFalse(elevator.runOnce(elevator::stop));
+        // D-Pad Up - Elevator Up
+        new Trigger(() -> joystick0.getPOV() == 0).whileTrue(elevator.run(() -> elevator.set(0.5))).onFalse(elevator.runOnce(elevator::stop));
         
-        // D-Pad Right - Elevator Down
-        new Trigger(() -> joystick0.getPOV() == 270).whileTrue(elevator.run(() -> elevator.set(-0.5))).onFalse(elevator.runOnce(elevator::stop));
-
-        // D-Pad Down - Play Music
-        new Trigger(() -> joystick0.getPOV() == 270).whileTrue(elevator.run(() -> elevator.set(-0.5))).onFalse(elevator.runOnce(elevator::stop));
+        // D-Pad Down - Elevator Down
+        new Trigger(() -> joystick0.getPOV() == 360).whileTrue(elevator.run(() -> elevator.set(-0.5))).onFalse(elevator.runOnce(elevator::stop));
         
         // Start Button - Zero Gyro
         new Trigger(() -> joystick0.getStartButton()).onTrue(drivetrain.runOnce(() -> drivetrain.seedFieldCentric()));
@@ -128,7 +120,7 @@ public class RobotContainer {
         new Trigger(() -> joystick0.getRightTriggerAxis() > 0.05).whileTrue(intake.run(() -> intake.open(-joystick0.getRightTriggerAxis()))).onFalse(intake.runOnce(intake::stop));
 
         // Left Trigger - Manual Shooter ( Manually Run Shooter )
-        new Trigger(() -> joystick0.getLeftTriggerAxis() > 0.05).whileTrue(shooter.run(() -> shooter.set(-joystick0.getLeftTriggerAxis()))).onFalse(shooter.runOnce(shooter::stop));
+        new Trigger(() -> joystick0.getLeftTriggerAxis() > 0.05).whileTrue(shooter.run(() -> shooter.runRotationsAsController(joystick0.getLeftTriggerAxis()))).onFalse(shooter.runOnce(shooter::stop));
 
         drivetrain.setDefaultCommand(
             drivetrain.applyRequest(() ->
@@ -141,16 +133,16 @@ public class RobotContainer {
         // Joystick1 - Operator Controller
 
         // D-Pad Up - Follow Code
-        new Trigger(() -> joystick1.getPOV() == 0).whileTrue(new TrackCode(drivetrain, joystick0));
+        new Trigger(() -> joystick1.getLeftTriggerAxis() > 0.2).whileTrue(new TrackCode(drivetrain, joystick1, lights, true));
 
         // D-Pad Left - Elevator Up
-        new Trigger(() -> joystick1.getPOV() == 90).whileTrue(elevator.run(() -> elevator.set(0.5))).onFalse(elevator.runOnce(elevator::stop));
+        new Trigger(() -> joystick1.getPOV() == 0).whileTrue(elevator.run(() -> elevator.set(0.5))).onFalse(elevator.runOnce(elevator::stop));
 
         // D-Pad Right - Elevator Down
-        new Trigger(() -> joystick1.getPOV() == 270).whileTrue(elevator.run(() -> elevator.set(-0.5))).onFalse(elevator.runOnce(elevator::stop));
+        new Trigger(() -> joystick1.getPOV() == 360).whileTrue(elevator.run(() -> elevator.set(-0.5))).onFalse(elevator.runOnce(elevator::stop));
 
         // Estimate Pose from Limelights
-        new Trigger(() -> joystick1.getLeftBumper()).whileTrue(new EstimatePose(lights,drivetrain));
+        new Trigger(() -> joystick1.getLeftBumper()).whileTrue(new EstimatePose(lights,drivetrain,true));
 
         // Idle & Telemetry
                     
@@ -177,7 +169,7 @@ public class RobotContainer {
             () -> drivetrain.applyRequest(
                 () -> new SwerveRequest.RobotCentric()
                     .withDriveRequestType(DriveRequestType.OpenLoopVoltage)
-                    .withVelocityX(0.5)
+                    .withVelocityX(0.3)
                     .withVelocityY(0)
                     .withRotationalRate(0)
             )
