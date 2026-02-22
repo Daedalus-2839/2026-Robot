@@ -1,4 +1,5 @@
-# 2026 Robot
+# 2026 Robot (OUTDATED)
+This can be moved from https://github.com/Sacrafex after the season is over.
 
 ## Controls
 
